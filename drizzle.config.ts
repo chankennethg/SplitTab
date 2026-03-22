@@ -5,6 +5,8 @@ export default defineConfig({
   out: "./src/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL!,
+    // DIRECT_URL bypasses Supabase's PgBouncer pooler, required for DDL migrations.
+    // Falls back to DATABASE_URL for local dev where pooler isn't used.
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL!,
   },
 });
