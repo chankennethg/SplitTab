@@ -1,0 +1,23 @@
+name: Preview — Staging Migrations
+
+on:
+  pull_request:
+    branches: [main, master]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  migrate-staging:
+    name: Run Staging Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Apply staging migrations
+        run: npm run db:migrate
+        env:
+          # Use direct connection URL for staging DDL migrations
+          DATABASE_URL: ${{ secrets.STAGING_DIRECT_URL }}
