@@ -1,0 +1,38 @@
+{
+  "name": "splittab",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.4.3",
+    "drizzle-orm": "^0.40.0",
+    "hono": "^4.7.7",
+    "next": "15.2.3",
+    "postgres": "^3.4.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.3.4",
+    "drizzle-kit": "^0.30.5",
+    "eslint": "^9",
+    "eslint-config-next": "15.2.3",
+    "typescript": "^5",
+    "vitest": "^3.1.1"
+  }
+}
