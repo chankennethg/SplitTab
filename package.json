@@ -18,7 +18,7 @@
     "@hono/zod-validator": "^0.4.3",
     "drizzle-orm": "^0.40.0",
     "hono": "^4.7.7",
-    "next": "15.2.3",
+    "next": "^16.2.1",
     "postgres": "^3.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -31,7 +31,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "drizzle-kit": "^0.30.5",
     "eslint": "^9",
-    "eslint-config-next": "15.2.3",
+    "eslint-config-next": "^16.2.1",
     "typescript": "^5",
     "vitest": "^3.1.1"
   }
