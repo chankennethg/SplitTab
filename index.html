@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SplitTab</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0e0e10; --surface: #18181c; --surface2: #222228;
+    --border: #2e2e38; --accent: #c8f045; --accent2: #ff6b6b;
+    --text: #f0f0f0; --muted: #888; --radius: 14px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; padding: 0 0 80px; }
+
+  /* Save indicator */
+  #saveIndicator {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 7px 16px;
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+    opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 50;
+    white-space: nowrap;
+  }
+  #saveIndicator.show { opacity: 1; }
+  #saveIndicator.saved { color: var(--accent); border-color: rgba(200,240,69,.3); }
+  #saveIndicator.error { color: var(--accent2); border-color: rgba(255,107,107,.3); }
+  .save-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  header { padding: 28px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg); z-index: 10; }
+  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo span { color: var(--accent); }
+  .count-badge { font-family: 'DM Mono', monospace; font-size: 10px; background: rgba(200,240,69,.1); color: var(--accent); border: 1px solid rgba(200,240,69,.2); border-radius: 12px; padding: 3px 8px; font-weight: 500; }
+
+  .tab-bar { display: flex; gap: 6px; padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  .tab { flex: 1; padding: 9px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .tab.active { background: var(--accent); color: #0e0e10; border-color: var(--accent); }
+
+  .section { display: none; padding: 20px; }
+  .section.active { display: block; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  input, select { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 15px; padding: 11px 13px; outline: none; transition: border-color .2s; margin-bottom: 12px; }
+  input:focus, select:focus { border-color: var(--accent); }
+
+  .btn { width: 100%; padding: 13px; background: var(--accent); color: #0e0e10; border: none; border-radius: 10px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity .2s, transform .1s; letter-spacing: 0.3px; }
+  .btn:active { transform: scale(0.98); opacity: 0.85; }
+  .btn-danger { background: rgba(255,107,107,.15); color: var(--accent2); border: 1px solid rgba(255,107,107,.2); margin-top: 8px; }
+
+  .member-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 6px 12px 6px 10px; margin: 4px; font-size: 13px; font-weight: 600; }
+  .member-chip .del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0; width: auto; }
+  .chips-wrap { flex-wrap: wrap; display: flex; margin-bottom: 12px; }
+
+  .expense-item { border-bottom: 1px solid var(--border); padding: 12px 0; }
+  .expense-item:last-child { border-bottom: none; }
+  .expense-name { font-weight: 700; font-size: 15px; margin-bottom: 3px; }
+  .expense-meta { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+  .expense-amount { font-family: 'DM Mono', monospace; font-weight: 500; color: var(--accent); font-size: 16px; }
+  .expense-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .del-expense { background: none; border: none; color: var(--accent2); font-size: 18px; cursor: pointer; padding: 0 0 0 10px; font-family: inherit; }
+
+  .section-title { font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  .settle-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; transition: border-color .2s, background .2s; }
+  .settle-card.is-paid { background: rgba(200,240,69,.04); border-color: rgba(200,240,69,.2); }
+  .settle-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .settle-names { font-size: 14px; font-weight: 700; flex: 1; }
+  .settle-names .from { color: var(--accent2); }
+  .settle-names .to { color: var(--accent); }
+  .settle-amt { font-family: 'DM Mono', monospace; font-size: 17px; font-weight: 500; color: var(--text); white-space: nowrap; }
+  .settle-subtext { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .paid-btn { width: 100%; padding: 9px; border-radius: 8px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .2s; letter-spacing: 0.3px; border: none; background: rgba(200,240,69,.1); color: var(--accent); }
+  .paid-btn.marked { background: rgba(200,240,69,.2); }
+  .paid-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--accent); background: rgba(200,240,69,.1); border-radius: 5px; padding: 3px 8px; }
+  .settle-card.is-paid .settle-amt { text-decoration: line-through; opacity: 0.4; }
+  .settle-card.is-paid .settle-names .from, .settle-card.is-paid .settle-names .to { opacity: 0.5; }
+
+  .explainer-box { background: rgba(200,240,69,.06); border: 1px solid rgba(200,240,69,.18); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 20px; }
+  .explainer-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .explainer-steps { display: flex; flex-direction: column; gap: 8px; }
+  .explainer-step { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #ccc; line-height: 1.5; }
+  .step-num { background: var(--accent); color: #0e0e10; font-size: 11px; font-weight: 800; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+
+  .balance-row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 13px 15px; margin-bottom: 8px; }
+  .balance-row-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .balance-name { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+  .balance-net { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; }
+  .balance-net.positive { color: var(--accent); }
+  .balance-net.negative { color: var(--accent2); }
+  .balance-net.zero { color: var(--muted); }
+  .balance-detail-line { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .balance-detail-line span:last-child { color: var(--text); }
+  .balance-status { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 6px; padding: 4px 8px; border-radius: 5px; display: inline-block; }
+  .balance-status.owed { background: rgba(200,240,69,.1); color: var(--accent); }
+  .balance-status.owes { background: rgba(255,107,107,.1); color: var(--accent2); }
+  .balance-status.clear { background: rgba(136,136,136,.1); color: var(--muted); }
+
+  .exp-detail-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+  .exp-detail-header { padding: 11px 15px; background: var(--surface2); display: flex; justify-content: space-between; align-items: center; }
+  .exp-detail-title { font-size: 14px; font-weight: 700; }
+  .exp-detail-amount { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--accent); }
+  .exp-detail-paidby { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .exp-detail-splits { padding: 10px 15px; }
+  .exp-split-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .exp-split-row:last-child { border-bottom: none; }
+  .exp-split-left { display: flex; align-items: center; gap: 7px; }
+  .exp-split-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+  .tag-paid { background: rgba(200,240,69,.12); color: var(--accent); }
+  .tag-owes { background: rgba(255,107,107,.12); color: var(--accent2); }
+  .tag-self { background: rgba(107,197,255,.12); color: #6bc5ff; }
+
+  .total-bar { background: var(--surface2); border-radius: 10px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .total-bar span:first-child { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .total-bar span:last-child { font-family: 'DM Mono', monospace; font-size: 18px; color: var(--accent); }
+
+  .avatar { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+
+  .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); letter-spacing: 0; text-transform: none; font-weight: 600; margin-bottom: 6px; cursor: pointer; }
+  .checkbox-label input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; flex-shrink: 0; }
+
+  .split-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+  .split-opt { flex: 1; padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .2s; }
+  .split-opt.active { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+
+  .notice { background: rgba(200,240,69,.07); border: 1px solid rgba(200,240,69,.2); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--accent); margin-bottom: 14px; font-family: 'DM Mono', monospace; }
+  .empty { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 0; }
+
+  .info-notice { display: flex; align-items: flex-start; gap: 8px; border-radius: 10px; padding: 10px 13px; margin-bottom: 14px; font-size: 12px; line-height: 1.5; }
+  .info-notice.local { background: rgba(107,197,255,.07); border: 1px solid rgba(107,197,255,.18); color: #6bc5ff; }
+  .info-notice.private { background: rgba(200,240,69,.05); border: 1px solid rgba(200,240,69,.15); color: #aaa; }
+</style>
+</head>
+<body>
+
+<div id="saveIndicator">
+  <div class="save-dot" id="saveDot"></div>
+  <span id="saveText">Saved</span>
+</div>
+
+<header>
+  <div class="logo">Split<span>Tab</span></div>
+  <div class="count-badge" id="countBadge">0 members</div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab active" onclick="showTab('members',event)">Members</button>
+  <button class="tab" onclick="showTab('expenses',event)">Expenses</button>
+  <button class="tab" onclick="showTab('settle',event)">Settle Up</button>
+</div>
+
+<!-- MEMBERS -->
+<div class="section active" id="tab-members">
+  <div class="info-notice local"><span>&#x1F4BE;</span><span>Data is saved on <strong>this device</strong> in your browser. It persists across app restarts.</span></div>
+  <div class="card">
+    <label>Add Member</label>
+    <input type="text" id="memberInput" placeholder="Name..." maxlength="24" />
+    <button class="btn" onclick="addMember()">+ Add Member</button>
+  </div>
+  <div class="card">
+    <div class="section-title">Group Members</div>
+    <div class="chips-wrap" id="memberChips"><div class="empty">No members yet.</div></div>
+  </div>
+  <div class="card">
+    <div class="section-title" style="margin-bottom:8px">Danger Zone</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Clears all members, expenses, and paid status from this device.</p>
+    <button class="btn btn-danger" onclick="clearAllData()">Clear All Data</button>
+  </div>
+</div>
+
+<!-- EXPENSES -->
+<div class="section" id="tab-expenses">
+  <div class="card">
+    <label>Expense Name</label>
+    <input type="text" id="expName" placeholder="e.g. Dinner, Groceries..." />
+    <label>Amount</label>
+    <input type="number" id="expAmount" placeholder="0.00" min="0" step="0.01" />
+    <label>Paid By</label>
+    <select id="expPayer"></select>
+    <label>Split Type</label>
+    <div class="split-toggle">
+      <button class="split-opt active" id="splitEven" onclick="setSplitType('even')">Equal</button>
+      <button class="split-opt" id="splitCustom" onclick="setSplitType('custom')">Custom</button>
+    </div>
+    <div id="splitAmongWrap">
+      <label style="margin-bottom:8px">Split Among</label>
+      <div id="splitAmongList"></div>
+    </div>
+    <div id="customAmountsWrap" style="display:none">
+      <label style="margin-bottom:8px">Custom Amounts</label>
+      <div id="customAmountsList"></div>
+      <div class="notice" id="customNotice"></div>
+    </div>
+    <button class="btn" onclick="addExpense()">+ Add Expense</button>
+  </div>
+  <div class="card">
+    <div class="section-title">Logged Expenses</div>
+    <div id="expenseList"><div class="empty">No expenses yet.</div></div>
+  </div>
+</div>
+
+<!-- SETTLE UP -->
+<div class="section" id="tab-settle">
+  <div class="info-notice private"><span>&#x1F512;</span><span>Your <strong style="color:var(--accent)">paid status</strong> is saved privately on this device only.</span></div>
+  <div class="total-bar">
+    <span>Total Spent</span>
+    <span id="totalSpent">0.00</span>
+  </div>
+  <div class="explainer-box">
+    <div class="explainer-title">How this works</div>
+    <div class="explainer-steps">
+      <div class="explainer-step"><span class="step-num">1</span><span>Each expense is split among the chosen members.</span></div>
+      <div class="explainer-step"><span class="step-num">2</span><span>We track how much each person paid vs. how much they owe.</span></div>
+      <div class="explainer-step"><span class="step-num">3</span><span>The result below shows the simplest way to settle all debts.</span></div>
+      <div class="explainer-step"><span class="step-num">4</span><span>Tap <strong style="color:var(--accent)">Mark as Paid</strong> once you send the money. This is saved only on your device.</span></div>
+    </div>
+  </div>
+  <div class="section-title">Who Owes Who</div>
+  <div id="settleList"><div class="empty">Add expenses to see settlements.</div></div>
+  <div id="balanceBreakdownWrap" style="display:none">
+    <div class="section-title" style="margin-top:22px">Per Person Breakdown</div>
+    <div id="balanceBreakdown"></div>
+  </div>
+  <div id="expDetailWrap" style="display:none">
+    <div class="section-title" style="margin-top:22px">Expense Detail</div>
+    <div id="expDetail"></div>
+  </div>
+</div>
+
+<script>
+  let members = [], expenses = [];
+  let paidTransactions = new Set();
+  let splitType = 'even';
+  const colors = ['#c8f045','#ff6b6b','#6bc5ff','#ffb86b','#c26bff','#6bffb8','#ff6bc2','#6b8fff'];
+
+  function getColor(n) { const i = members.indexOf(n) % colors.length; return colors[i >= 0 ? i : 0]; }
+  function txKey(t) { return t.from + '|' + t.to + '|' + t.amount.toFixed(2); }
+
+  // LocalStorage
+  function saveAll() {
+    try {
+      localStorage.setItem('splittab-members', JSON.stringify(members));
+      localStorage.setItem('splittab-expenses', JSON.stringify(expenses));
+      localStorage.setItem('splittab-paid', JSON.stringify([...paidTransactions]));
+      flashSaved();
+    } catch(e) { flashError(); }
+  }
+
+  function savePaid() {
+    try {
+      localStorage.setItem('splittab-paid', JSON.stringify([...paidTransactions]));
+      flashSaved();
+    } catch(e) { flashError(); }
+  }
+
+  function loadAll() {
+    try { members = JSON.parse(localStorage.getItem('splittab-members') || '[]'); } catch(e) { members = []; }
+    try { expenses = JSON.parse(localStorage.getItem('splittab-expenses') || '[]'); } catch(e) { expenses = []; }
+    try { paidTransactions = new Set(JSON.parse(localStorage.getItem('splittab-paid') || '[]')); } catch(e) { paidTransactions = new Set(); }
+  }
+
+  // Save flash
+  let saveTimer;
+  function flashSaved() {
+    const el = document.getElementById('saveIndicator');
+    el.className = 'show saved';
+    document.getElementById('saveText').textContent = 'Saved';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function() { el.className = ''; }, 1800);
+  }
+  function flashError() {
+    const el = document.getElementById('saveIndicator');
+    el.className = 'show error';
+    document.getElementById('saveText').textContent = 'Could not save';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function() { el.className = ''; }, 3000);
+  }
+
+  // Init
+  loadAll();
+  renderMembers(); updateHeader(); renderExpenseForm(); renderExpenseList();
+
+  // Tabs
+  function showTab(tab, e) {
+    document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (e && e.target) e.target.classList.add('active');
+    if (tab === 'expenses') renderExpenseForm();
+    if (tab === 'settle') renderSettle();
+  }
+
+  // Members
+  function addMember() {
+    const inp = document.getElementById('memberInput');
+    const name = inp.value.trim();
+    if (!name) return;
+    if (members.includes(name)) { alert('Already exists.'); return; }
+    members.push(name); inp.value = '';
+    renderMembers(); updateHeader(); saveAll();
+  }
+  document.getElementById('memberInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') addMember(); });
+
+  function removeMember(name) {
+    members = members.filter(function(m) { return m !== name; });
+    renderMembers(); updateHeader(); saveAll();
+  }
+
+  function renderMembers() {
+    const w = document.getElementById('memberChips');
+    if (!members.length) { w.innerHTML = '<div class="empty">No members yet.</div>'; return; }
+    w.innerHTML = members.map(function(m) {
+      return '<div class="member-chip">' +
+        '<div class="avatar" style="background:' + getColor(m) + '20;color:' + getColor(m) + '">' + m[0].toUpperCase() + '</div>' +
+        m +
+        '<button class="del" onclick="removeMember(\'' + m.replace(/'/g, "\\'") + '\')">&#x2715;</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  function updateHeader() {
+    document.getElementById('countBadge').textContent = members.length
+      ? members.length + (members.length === 1 ? ' member' : ' members')
+      : '0 members';
+  }
+
+  function clearAllData() {
+    if (!confirm('Clear all data on this device? This cannot be undone.')) return;
+    members = []; expenses = []; paidTransactions = new Set();
+    localStorage.removeItem('splittab-members');
+    localStorage.removeItem('splittab-expenses');
+    localStorage.removeItem('splittab-paid');
+    renderMembers(); renderExpenseList(); renderExpenseForm(); updateHeader();
+    flashSaved();
+  }
+
+  // Split type
+  function setSplitType(type) {
+    splitType = type;
+    document.getElementById('splitEven').classList.toggle('active', type === 'even');
+    document.getElementById('splitCustom').classList.toggle('active', type === 'custom');
+    document.getElementById('splitAmongWrap').style.display = type === 'even' ? '' : 'none';
+    document.getElementById('customAmountsWrap').style.display = type === 'custom' ? '' : 'none';
+  }
+
+  // Expense form
+  function renderExpenseForm() {
+    document.getElementById('expPayer').innerHTML = members.length
+      ? members.map(function(m) { return '<option value="' + m + '">' + m + '</option>'; }).join('')
+      : '<option value="">-- Add members first --</option>';
+
+    document.getElementById('splitAmongList').innerHTML = members.length
+      ? members.map(function(m) {
+          return '<label class="checkbox-label">' +
+            '<input type="checkbox" value="' + m + '" checked />' +
+            '<div class="avatar" style="background:' + getColor(m) + '20;color:' + getColor(m) + ';width:22px;height:22px;font-size:10px">' + (m[0] ? m[0].toUpperCase() : '') + '</div>' +
+            m + '</label>';
+        }).join('')
+      : '<div class="empty" style="padding:8px 0">No members yet.</div>';
+
+    document.getElementById('customAmountsList').innerHTML = members.length
+      ? members.map(function(m) {
+          return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+            '<div class="avatar" style="background:' + getColor(m) + '20;color:' + getColor(m) + ';width:24px;height:24px;font-size:11px;flex-shrink:0">' + (m[0] ? m[0].toUpperCase() : '') + '</div>' +
+            '<span style="flex:1;font-size:13px;font-weight:600">' + m + '</span>' +
+            '<input type="number" id="custom_' + m + '" placeholder="0.00" min="0" step="0.01"' +
+            ' style="width:90px;margin:0;padding:8px 10px;font-size:13px" oninput="updateCustomNotice()" />' +
+            '</div>';
+        }).join('')
+      : '<div class="empty" style="padding:8px 0">No members yet.</div>';
+  }
+
+  function updateCustomNotice() {
+    const total = parseFloat(document.getElementById('expAmount').value) || 0;
+    let sum = 0;
+    members.forEach(function(m) { sum += parseFloat(document.getElementById('custom_' + m) ? document.getElementById('custom_' + m).value : 0) || 0; });
+    const diff = total - sum;
+    const n = document.getElementById('customNotice');
+    if (Math.abs(diff) < 0.01) { n.textContent = 'Amounts match total.'; n.style.color = 'var(--accent)'; }
+    else { n.textContent = diff > 0 ? 'Remaining: ' + diff.toFixed(2) : 'Over by: ' + Math.abs(diff).toFixed(2); n.style.color = diff > 0 ? 'var(--accent)' : 'var(--accent2)'; }
+  }
+  document.getElementById('expAmount').addEventListener('input', updateCustomNotice);
+
+  function addExpense() {
+    const name = document.getElementById('expName').value.trim();
+    const amount = parseFloat(document.getElementById('expAmount').value);
+    const payer = document.getElementById('expPayer').value;
+    if (!name || !amount || !payer) { alert('Fill in all fields.'); return; }
+    if (!members.length) { alert('Add members first.'); return; }
+
+    let splits = {};
+    if (splitType === 'even') {
+      const checked = [];
+      document.querySelectorAll('#splitAmongList input:checked').forEach(function(i) { checked.push(i.value); });
+      if (!checked.length) { alert('Select at least one person.'); return; }
+      const share = amount / checked.length;
+      checked.forEach(function(m) { splits[m] = share; });
+    } else {
+      let sum = 0;
+      members.forEach(function(m) {
+        const el = document.getElementById('custom_' + m);
+        const v = el ? (parseFloat(el.value) || 0) : 0;
+        splits[m] = v; sum += v;
+      });
+      if (Math.abs(sum - amount) > 0.01) { alert('Custom amounts must equal the total.'); return; }
+    }
+
+    expenses.push({ id: Date.now(), name: name, amount: amount, payer: payer, splits: splits });
+    document.getElementById('expName').value = '';
+    document.getElementById('expAmount').value = '';
+    renderExpenseList(); renderExpenseForm(); saveAll();
+  }
+
+  function removeExpense(id) {
+    expenses = expenses.filter(function(e) { return e.id !== id; });
+    renderExpenseList(); saveAll();
+  }
+
+  function renderExpenseList() {
+    const list = document.getElementById('expenseList');
+    if (!expenses.length) { list.innerHTML = '<div class="empty">No expenses yet.</div>'; return; }
+    list.innerHTML = expenses.slice().reverse().map(function(e) {
+      const splits = Object.entries(e.splits).filter(function(kv) { return kv[1] > 0; })
+        .map(function(kv) { return kv[0] + ': ' + kv[1].toFixed(2); }).join(' &middot; ');
+      return '<div class="expense-item">' +
+        '<div class="expense-row">' +
+        '<div>' +
+        '<div class="expense-name">' + e.name + '</div>' +
+        '<div class="expense-meta">Paid by <span style="color:' + getColor(e.payer) + ';font-weight:700">' + e.payer + '</span></div>' +
+        '<div class="expense-meta" style="margin-top:2px">' + splits + '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+        '<span class="expense-amount">' + parseFloat(e.amount).toFixed(2) + '</span>' +
+        '<button class="del-expense" onclick="removeExpense(' + e.id + ')">&#x2715;</button>' +
+        '</div></div></div>';
+    }).join('');
+  }
+
+  // Settle
+  function togglePaid(key) {
+    if (paidTransactions.has(key)) paidTransactions.delete(key);
+    else paidTransactions.add(key);
+    savePaid(); renderSettle();
+  }
+
+  function renderSettle() {
+    const total = expenses.reduce(function(s, e) { return s + e.amount; }, 0);
+    document.getElementById('totalSpent').textContent = total.toFixed(2);
+
+    const paid = {}, owed = {};
+    members.forEach(function(m) { paid[m] = 0; owed[m] = 0; });
+    expenses.forEach(function(e) {
+      if (paid[e.payer] !== undefined) paid[e.payer] += e.amount;
+      Object.entries(e.splits).forEach(function(kv) { if (owed[kv[0]] !== undefined) owed[kv[0]] += kv[1]; });
+    });
+    const balance = {};
+    members.forEach(function(m) { balance[m] = paid[m] - owed[m]; });
+
+    const debtors = Object.entries(balance).filter(function(kv) { return kv[1] < -0.01; }).map(function(kv) { return { name: kv[0], amt: -kv[1] }; });
+    const creditors = Object.entries(balance).filter(function(kv) { return kv[1] > 0.01; }).map(function(kv) { return { name: kv[0], amt: kv[1] }; });
+    const transactions = [];
+    let i = 0, j = 0;
+    while (i < debtors.length && j < creditors.length) {
+      const p = Math.min(debtors[i].amt, creditors[j].amt);
+      transactions.push({ from: debtors[i].name, to: creditors[j].name, amount: p });
+      debtors[i].amt -= p; creditors[j].amt -= p;
+      if (debtors[i].amt < 0.01) i++;
+      if (creditors[j].amt < 0.01) j++;
+    }
+
+    const list = document.getElementById('settleList');
+    if (!transactions.length) {
+      list.innerHTML = expenses.length ? '<div class="empty">Everyone is settled up!</div>' : '<div class="empty">Add expenses to see settlements.</div>';
+    } else {
+      list.innerHTML = transactions.map(function(t) {
+        const key = txKey(t);
+        const isPaid = paidTransactions.has(key);
+        return '<div class="settle-card ' + (isPaid ? 'is-paid' : '') + '">' +
+          '<div class="settle-card-top">' +
+          '<div>' +
+          '<div class="settle-names"><span class="from">' + t.from + '</span><span style="color:var(--muted)"> pays </span><span class="to">' + t.to + '</span></div>' +
+          '<div class="settle-subtext">' + t.from + ' should transfer this amount to ' + t.to + '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+          (isPaid ? '<span class="paid-badge">&#10003; Paid</span>' : '') +
+          '<span class="settle-amt">' + t.amount.toFixed(2) + '</span>' +
+          '</div></div>' +
+          '<button class="paid-btn ' + (isPaid ? 'marked' : '') + '" onclick="togglePaid(\'' + key + '\')">' +
+          (isPaid ? '&#10003; Marked as Paid &nbsp;(tap to undo)' : 'Mark as Paid') +
+          '</button></div>';
+      }).join('');
+    }
+
+    if (!expenses.length) {
+      document.getElementById('balanceBreakdownWrap').style.display = 'none';
+      document.getElementById('expDetailWrap').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('balanceBreakdownWrap').style.display = '';
+    document.getElementById('balanceBreakdown').innerHTML = members.map(function(m) {
+      const net = balance[m];
+      const nc = net > 0.01 ? 'positive' : net < -0.01 ? 'negative' : 'zero';
+      const sl = net > 0.01 ? 'Gets back' : net < -0.01 ? 'Owes others' : 'All clear';
+      const sc = net > 0.01 ? 'owed' : net < -0.01 ? 'owes' : 'clear';
+      return '<div class="balance-row">' +
+        '<div class="balance-row-top">' +
+        '<div class="balance-name">' +
+        '<div class="avatar" style="background:' + getColor(m) + '20;color:' + getColor(m) + ';width:26px;height:26px;font-size:11px">' + m[0].toUpperCase() + '</div>' +
+        m + '</div>' +
+        '<span class="balance-net ' + nc + '">' + (net > 0.01 ? '+' : '') + net.toFixed(2) + '</span>' +
+        '</div>' +
+        '<div class="balance-detail-line"><span>Total paid</span><span>' + paid[m].toFixed(2) + '</span></div>' +
+        '<div class="balance-detail-line"><span>Total share owed</span><span>' + owed[m].toFixed(2) + '</span></div>' +
+        '<div><span class="balance-status ' + sc + '">' + sl + ': ' + Math.abs(net).toFixed(2) + '</span></div>' +
+        '</div>';
+    }).join('');
+
+    document.getElementById('expDetailWrap').style.display = '';
+    document.getElementById('expDetail').innerHTML = expenses.map(function(e) {
+      const se = Object.entries(e.splits).filter(function(kv) { return kv[1] > 0; });
+      const rows = se.map(function(kv) {
+        const m = kv[0], share = kv[1];
+        const ip = m === e.payer;
+        let tag, tc;
+        if (ip && se.length === 1) { tag = 'Paid for self'; tc = 'tag-self'; }
+        else if (ip) { tag = 'Paid'; tc = 'tag-paid'; }
+        else { tag = 'Owes'; tc = 'tag-owes'; }
+        const note = ip && se.length > 1 ? 'covered ' + (e.amount - share).toFixed(2) + ' for others' : ip ? 'paid for themselves only' : 'owes ' + e.payer;
+        return '<div class="exp-split-row">' +
+          '<div class="exp-split-left">' +
+          '<div class="avatar" style="background:' + getColor(m) + '20;color:' + getColor(m) + ';width:22px;height:22px;font-size:10px">' + m[0].toUpperCase() + '</div>' +
+          '<div><div style="font-weight:700">' + m + '</div><div style="font-size:11px;color:var(--muted)">' + note + '</div></div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:7px">' +
+          '<span class="exp-split-tag ' + tc + '">' + tag + '</span>' +
+          '<span style="font-family:\'DM Mono\',monospace;font-size:13px">' + share.toFixed(2) + '</span>' +
+          '</div></div>';
+      }).join('');
+      return '<div class="exp-detail-card">' +
+        '<div class="exp-detail-header">' +
+        '<div><div class="exp-detail-title">' + e.name + '</div>' +
+        '<div class="exp-detail-paidby">Paid by <span style="color:' + getColor(e.payer) + ';font-weight:700">' + e.payer + '</span></div></div>' +
+        '<span class="exp-detail-amount">' + parseFloat(e.amount).toFixed(2) + '</span>' +
+        '</div>' +
+        '<div class="exp-detail-splits">' + rows + '</div>' +
+        '</div>';
+    }).join('');
+  }
+</script>
+
+</body>
+</html>
