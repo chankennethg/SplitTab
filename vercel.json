@@ -1,9 +1,5 @@
 {
   "buildCommand": "npm run vercel-build",
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "DIRECT_URL": "@direct_url"
-  }
+  "regions": ["iad1"]
 }
