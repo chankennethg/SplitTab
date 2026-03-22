@@ -21,7 +21,6 @@ export function getDb() {
 // Convenience proxy — behaves like the db object but initialises lazily
 export const db = new Proxy({} as ReturnType<typeof createDb>, {
   get(_target, prop) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (getDb() as unknown as Record<string | symbol, unknown>)[prop];
   },
 });

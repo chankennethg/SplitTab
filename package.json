@@ -7,7 +7,7 @@
     "build": "next build",
     "vercel-build": "npm run db:migrate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
