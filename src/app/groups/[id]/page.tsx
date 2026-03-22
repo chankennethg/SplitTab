@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, use } from "react";
+import Link from "next/link";
 import { getGroup, getMembers, getExpenses } from "@/lib/api-client";
 import type { Group, Member, Expense } from "@/types";
 import MembersTab from "@/components/MembersTab";
@@ -52,18 +53,18 @@ export default function GroupPage({
       <>
         <header className="header">
           <div className="header-inner">
-            <a className="logo" href="/">
+            <Link className="logo" href="/">
               Split<span className="logo-accent">Tab</span>
-            </a>
+            </Link>
           </div>
         </header>
         <main className="container">
           <div className="empty-state" style={{ paddingTop: 60 }}>
             <div style={{ fontSize: "2rem", marginBottom: 8 }}>404</div>
             <div>{loadError}</div>
-            <a href="/" style={{ color: "var(--accent)", marginTop: 12, display: "block" }}>
+            <Link href="/" style={{ color: "var(--accent)", marginTop: 12, display: "block" }}>
               Create a new group
-            </a>
+            </Link>
           </div>
         </main>
       </>
@@ -74,9 +75,9 @@ export default function GroupPage({
     <>
       <header className="header">
         <div className="header-inner">
-          <a className="logo" href="/">
+          <Link className="logo" href="/">
             Split<span className="logo-accent">Tab</span>
-          </a>
+          </Link>
           <div className="member-badge">
             {members.length} {members.length === 1 ? "member" : "members"}
           </div>
